@@ -41,6 +41,14 @@
             pendingRequests.delete(requestId);
             p.reject(new Error(message));
         },
+        // Called from Swift on Cmd+W — close the active file tab (not the whole panel)
+        closeActiveTab() {
+            if (activeFilePath) {
+                closeFileTab(activeFilePath);
+                return true;
+            }
+            return false;
+        },
         // Called from Swift when theme changes
         updateMonacoTheme(editorBg, editorFg) {
             if (!monacoInstance || !editor) return;
@@ -70,8 +78,8 @@
 
     // ── File Ops ───────────────────────────────────────────────────────
     let diffEditor = null;
-    let diffSideBySide = true;
-    let currentDiffPath = null;
+    let diffMode = 'side-by-side'; // 'off' | 'inline' | 'side-by-side'
+    let currentEditorType = null; // 'normal' | 'diff'
 
     const readDir = (path) => post('readDir', { path });
     const readFile = async (path) => (await post('readFile', { path })).content;
@@ -450,18 +458,11 @@
 
         const parentDir = isDir ? targetPath : targetPath.substring(0, targetPath.lastIndexOf('/')) || '';
 
-        const gitStatus = isDir ? null : getGitStatusForPath(targetPath);
         const items = [
             { label: 'New File...', action: () => promptNewFile(parentDir) },
             { label: 'New Folder...', action: () => promptNewFolder(parentDir) },
             { separator: true },
         ];
-
-        // Add diff option for git-tracked modified files
-        if (gitStatus && gitStatus !== 'ignored' && gitStatus !== 'untracked' && !isDir) {
-            items.push({ label: 'Open Changes', action: () => openDiff(targetPath, name) });
-            items.push({ separator: true });
-        }
 
         items.push(
             { label: 'Rename', shortcut: 'F2', action: () => {
@@ -713,6 +714,14 @@
     // ── Tabs ───────────────────────────────────────────────────────────
     const tabsBar = document.getElementById('tabs-bar');
 
+    function updateDiffToggle() {
+        const toggle = document.getElementById('diff-mode-toggle');
+        if (!toggle) return;
+        toggle.querySelectorAll('.diff-toggle-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === diffMode);
+        });
+    }
+
     function renderTabs() {
         tabsBar.innerHTML = '';
         for (const [path, file] of openFiles) {
@@ -739,6 +748,22 @@
             tab.addEventListener('click', () => switchToFile(path));
             tabsBar.appendChild(tab);
         }
+
+        // Diff mode toggle (right side of tab bar)
+        const toggle = document.createElement('div');
+        toggle.id = 'diff-mode-toggle';
+        toggle.className = 'diff-mode-toggle';
+
+        for (const [mode, label] of [['off', 'Off'], ['inline', 'Inline'], ['side-by-side', 'SxS']]) {
+            const btn = document.createElement('button');
+            btn.className = 'diff-toggle-btn' + (mode === diffMode ? ' active' : '');
+            btn.dataset.mode = mode;
+            btn.textContent = label;
+            btn.title = `Diff: ${label}` + (mode === 'off' ? '' : ' (Cmd+D to cycle)');
+            btn.addEventListener('click', (e) => { e.stopPropagation(); setDiffMode(mode); });
+            toggle.appendChild(btn);
+        }
+        tabsBar.appendChild(toggle);
     }
 
     // ── File Management ────────────────────────────────────────────────
@@ -748,9 +773,29 @@
             const content = await readFile(path);
             const lang = getLang(name);
             const model = monacoInstance.editor.createModel(content, lang);
-            const fileEntry = { model, viewState: null, isDirty: false, originalContent: content };
+
+            // Fetch git original for diff
+            let gitOriginal = null;
+            const gitStatus = getGitStatusForPath(path);
+            if (gitStatus && gitStatus !== 'untracked' && gitStatus !== 'ignored') {
+                try {
+                    const result = await gitShow(path);
+                    if (result.exists) gitOriginal = result.content;
+                } catch {}
+            }
+
+            const fileEntry = {
+                model,
+                viewState: null,
+                diffViewState: null,
+                isDirty: false,
+                originalContent: content,
+                gitOriginal, // null if no git history
+                gitOriginalModel: gitOriginal !== null
+                    ? monacoInstance.editor.createModel(gitOriginal, lang)
+                    : null,
+            };
             model.onDidChangeContent(() => {
-                // Use fileEntry directly instead of path lookup — survives rename
                 const was = fileEntry.isDirty;
                 fileEntry.isDirty = model.getValue() !== fileEntry.originalContent;
                 if (was !== fileEntry.isDirty) { renderTabs(); notifyDirty(); }
@@ -762,19 +807,112 @@
 
     function switchToFile(path) {
         if (!openFiles.has(path)) return;
-        if (activeFilePath && openFiles.has(activeFilePath))
-            openFiles.get(activeFilePath).viewState = editor.saveViewState();
+
+        // Save current view state
+        saveCurrentViewState();
+
         activeFilePath = path;
         const f = openFiles.get(path);
-        editor.setModel(f.model);
-        if (f.viewState) editor.restoreViewState(f.viewState);
-        editor.focus();
-        document.getElementById('editor-container').classList.add('visible');
+        const hasDiff = f.gitOriginal !== null && diffMode !== 'off';
+
         document.getElementById('welcome').classList.remove('welcome-visible');
+
+        if (hasDiff) {
+            showAsDiff(f);
+        } else {
+            showAsNormal(f);
+        }
+
         renderTabs();
         selectedTreePath = path;
         highlightSelected();
         notifyActive(path.split('/').pop());
+    }
+
+    function saveCurrentViewState() {
+        if (!activeFilePath || !openFiles.has(activeFilePath)) return;
+        const f = openFiles.get(activeFilePath);
+        if (currentEditorType === 'diff' && diffEditor) {
+            f.diffViewState = diffEditor.saveViewState();
+        } else if (currentEditorType === 'normal' && editor) {
+            f.viewState = editor.saveViewState();
+        }
+    }
+
+    function showAsNormal(f) {
+        // Hide diff, show normal
+        document.getElementById('diff-container').classList.remove('visible');
+        document.getElementById('editor-container').classList.add('visible');
+
+        if (currentEditorType === 'diff' && diffEditor) {
+            diffEditor.dispose();
+            diffEditor = null;
+        }
+        currentEditorType = 'normal';
+
+        editor.setModel(f.model);
+        if (f.viewState) editor.restoreViewState(f.viewState);
+        editor.focus();
+    }
+
+    function showAsDiff(f) {
+        // Hide normal, show diff
+        document.getElementById('editor-container').classList.remove('visible');
+        const diffContainer = document.getElementById('diff-container');
+        diffContainer.classList.add('visible');
+
+        const sideBySide = diffMode === 'side-by-side';
+
+        if (currentEditorType !== 'diff' || !diffEditor) {
+            // Create diff editor
+            if (diffEditor) diffEditor.dispose();
+            diffContainer.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.className = 'diff-editor-wrap';
+            diffContainer.appendChild(wrap);
+
+            diffEditor = monacoInstance.editor.createDiffEditor(wrap, {
+                theme: 'cmux-dark',
+                fontSize: 13,
+                fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+                renderSideBySide: sideBySide,
+                enableSplitViewResizing: true,
+                ignoreTrimWhitespace: true,
+                renderIndicators: true,
+                originalEditable: false,
+                renderMarginRevertIcon: true,
+                diffAlgorithm: 'advanced',
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                padding: { top: 8, bottom: 8 },
+                minimap: { enabled: false },
+                renderOverviewRuler: true,
+            });
+            currentEditorType = 'diff';
+        } else {
+            diffEditor.updateOptions({ renderSideBySide: sideBySide });
+        }
+
+        diffEditor.setModel({
+            original: f.gitOriginalModel,
+            modified: f.model,
+        });
+        if (f.diffViewState) diffEditor.restoreViewState(f.diffViewState);
+        diffEditor.getModifiedEditor().focus();
+    }
+
+    function setDiffMode(mode) {
+        if (mode === diffMode) return;
+        saveCurrentViewState();
+        diffMode = mode;
+        updateDiffToggle();
+        // Re-render current file with new mode
+        if (activeFilePath && openFiles.has(activeFilePath)) {
+            const f = openFiles.get(activeFilePath);
+            const hasDiff = f.gitOriginal !== null && diffMode !== 'off';
+            if (hasDiff) showAsDiff(f);
+            else showAsNormal(f);
+        }
     }
 
     function closeFileTab(path) {
@@ -782,6 +920,7 @@
         if (!f) return;
         if (f.isDirty && !confirm(`Discard unsaved changes in "${path.split('/').pop()}"?`)) return;
         f.model.dispose();
+        if (f.gitOriginalModel) f.gitOriginalModel.dispose();
         openFiles.delete(path);
         if (activeFilePath === path) {
             const remaining = Array.from(openFiles.keys());
@@ -790,7 +929,10 @@
             } else {
                 activeFilePath = null;
                 editor.setModel(null);
+                if (diffEditor) { diffEditor.dispose(); diffEditor = null; }
+                currentEditorType = null;
                 document.getElementById('editor-container').classList.remove('visible');
+                document.getElementById('diff-container').classList.remove('visible');
                 document.getElementById('welcome').classList.add('welcome-visible');
                 notifyActive(null);
             }
@@ -813,133 +955,6 @@
         } catch (err) { console.error('Save failed:', err); }
     }
 
-    // ── Diff View ───────────────────────────────────────────────────────
-    async function openDiff(path, name) {
-        const gitStatus = getGitStatusForPath(path);
-        if (!gitStatus || gitStatus === 'ignored' || gitStatus === 'untracked') {
-            // No git history — just open normally
-            openFile(path, name);
-            return;
-        }
-
-        try {
-            const result = await gitShow(path);
-            const originalContent = result.exists ? result.content : '';
-            const currentContent = await readFile(path);
-
-            showDiffEditor(path, name, originalContent, currentContent, gitStatus);
-        } catch (err) {
-            console.error('Failed to open diff:', err);
-            openFile(path, name);
-        }
-    }
-
-    function showDiffEditor(path, name, originalContent, modifiedContent, status) {
-        currentDiffPath = path;
-
-        // Hide normal editor, show diff
-        document.getElementById('editor-container').classList.remove('visible');
-        document.getElementById('welcome').classList.remove('welcome-visible');
-        const diffContainer = document.getElementById('diff-container');
-        diffContainer.classList.add('visible');
-        diffContainer.innerHTML = '';
-
-        // Toolbar
-        const toolbar = document.createElement('div');
-        toolbar.className = 'diff-toolbar';
-
-        const title = document.createElement('span');
-        title.className = 'diff-toolbar-title';
-        const statusLabel = { modified: 'Modified', added: 'Added', deleted: 'Deleted', renamed: 'Renamed', conflict: 'Conflict' };
-        title.textContent = `${name} (${statusLabel[status] || status}) \u2194 ${name} (Working Tree)`;
-        toolbar.appendChild(title);
-
-        const actions = document.createElement('span');
-        actions.className = 'diff-toolbar-actions';
-
-        // Side-by-side toggle
-        const sxsBtn = document.createElement('button');
-        sxsBtn.className = 'diff-toolbar-btn' + (diffSideBySide ? ' active' : '');
-        sxsBtn.textContent = 'Side by Side';
-        sxsBtn.addEventListener('click', () => {
-            diffSideBySide = true;
-            sxsBtn.classList.add('active');
-            inlineBtn.classList.remove('active');
-            if (diffEditor) diffEditor.updateOptions({ renderSideBySide: true });
-        });
-        actions.appendChild(sxsBtn);
-
-        const inlineBtn = document.createElement('button');
-        inlineBtn.className = 'diff-toolbar-btn' + (!diffSideBySide ? ' active' : '');
-        inlineBtn.textContent = 'Inline';
-        inlineBtn.addEventListener('click', () => {
-            diffSideBySide = false;
-            inlineBtn.classList.add('active');
-            sxsBtn.classList.remove('active');
-            if (diffEditor) diffEditor.updateOptions({ renderSideBySide: false });
-        });
-        actions.appendChild(inlineBtn);
-
-        // Close diff button
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'diff-toolbar-btn';
-        closeBtn.textContent = '\u00D7 Close';
-        closeBtn.addEventListener('click', closeDiff);
-        actions.appendChild(closeBtn);
-
-        toolbar.appendChild(actions);
-        diffContainer.appendChild(toolbar);
-
-        // Diff editor wrapper
-        const wrap = document.createElement('div');
-        wrap.className = 'diff-editor-wrap';
-        diffContainer.appendChild(wrap);
-
-        // Create diff editor
-        if (diffEditor) diffEditor.dispose();
-        diffEditor = monacoInstance.editor.createDiffEditor(wrap, {
-            theme: 'cmux-dark',
-            fontSize: 13,
-            fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
-            renderSideBySide: diffSideBySide,
-            enableSplitViewResizing: true,
-            ignoreTrimWhitespace: true,
-            renderIndicators: true,
-            originalEditable: false,
-            renderMarginRevertIcon: true,
-            diffAlgorithm: 'advanced',
-            renderOverviewRuler: true,
-            automaticLayout: true,
-            scrollBeyondLastLine: false,
-            padding: { top: 8, bottom: 8 },
-            minimap: { enabled: false },
-        });
-
-        const lang = getLang(name);
-        const originalModel = monacoInstance.editor.createModel(originalContent, lang);
-        const modifiedModel = monacoInstance.editor.createModel(modifiedContent, lang);
-
-        diffEditor.setModel({
-            original: originalModel,
-            modified: modifiedModel,
-        });
-    }
-
-    function closeDiff() {
-        currentDiffPath = null;
-        const diffContainer = document.getElementById('diff-container');
-        diffContainer.classList.remove('visible');
-        diffContainer.innerHTML = '';
-        if (diffEditor) { diffEditor.dispose(); diffEditor = null; }
-
-        // Restore normal editor
-        if (activeFilePath) {
-            document.getElementById('editor-container').classList.add('visible');
-        } else {
-            document.getElementById('welcome').classList.add('welcome-visible');
-        }
-    }
-
     // ── Sidebar Resize ─────────────────────────────────────────────────
     const sidebar = document.getElementById('sidebar');
     const handle = document.getElementById('sidebar-resize-handle');
@@ -956,10 +971,11 @@
         if (mod && e.key === 'w') { e.preventDefault(); if (activeFilePath) closeFileTab(activeFilePath); }
         if (mod && e.key === 'n') { e.preventDefault(); promptNewFile(''); }
         if (mod && e.key === 'd' && !e.shiftKey) {
-            // Cmd+D: open diff for active file
+            // Cmd+D: cycle diff mode (off → inline → side-by-side → off)
             e.preventDefault();
-            const path = activeFilePath || selectedTreePath;
-            if (path) openDiff(path, path.split('/').pop());
+            const modes = ['off', 'inline', 'side-by-side'];
+            const next = modes[(modes.indexOf(diffMode) + 1) % modes.length];
+            setDiffMode(next);
         }
         if (e.key === 'F2' && selectedTreePath) {
             e.preventDefault();

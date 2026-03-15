@@ -8354,6 +8354,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                targetWindow.identifier?.rawValue == "cmux.settings" {
                 targetWindow.performClose(nil)
             } else {
+                // If an editor panel is focused, close the active file tab in JS instead of the panel
+                if let tabManager,
+                   let tabId = tabManager.selectedTabId,
+                   let workspace = tabManager.tabs.first(where: { $0.id == tabId }),
+                   let focusedPanelId = workspace.focusedPanelId,
+                   let editorPanel = workspace.editorPanel(for: focusedPanelId) {
+                    editorPanel.webView.evaluateJavaScript(
+                        "window.cmux.closeActiveTab && window.cmux.closeActiveTab()",
+                        completionHandler: nil
+                    )
+                    return true
+                }
+
                 let responder = event.window?.firstResponder
                     ?? NSApp.keyWindow?.firstResponder
                     ?? NSApp.mainWindow?.firstResponder

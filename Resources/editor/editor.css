@@ -399,47 +399,36 @@ body.grabbing-drag .tree-row { cursor: grabbing; }
 }
 #diff-container.visible { display: flex; }
 
-.diff-toolbar {
+.diff-editor-wrap { flex: 1; overflow: hidden; }
+
+/* Diff mode toggle in tab bar */
+.diff-mode-toggle {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 4px 12px;
-    background: var(--tab-bg);
-    border-bottom: 1px solid var(--tab-border);
-    font-size: 12px;
-    color: var(--sidebar-fg);
+    margin-left: auto;
+    padding: 0 8px;
+    gap: 1px;
     flex-shrink: 0;
-    height: 28px;
+    height: 35px;
 }
 
-.diff-toolbar-title {
-    opacity: 0.8;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.diff-toolbar-actions {
-    display: flex;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.diff-toolbar-btn {
+.diff-toggle-btn {
     background: none;
-    border: 1px solid var(--tab-border);
-    color: var(--sidebar-fg);
+    border: 1px solid transparent;
+    color: var(--tab-inactive-fg);
     cursor: pointer;
     font-size: 11px;
     padding: 2px 8px;
     border-radius: 3px;
-    opacity: 0.8;
+    line-height: 16px;
 }
 
-.diff-toolbar-btn:hover { opacity: 1; background: var(--list-hover-bg); }
-.diff-toolbar-btn.active { background: var(--list-active-selection-bg); color: var(--list-active-selection-fg); border-color: var(--focus-border); opacity: 1; }
-
-.diff-editor-wrap { flex: 1; overflow: hidden; }
+.diff-toggle-btn:hover { color: var(--sidebar-fg); background: var(--list-hover-bg); }
+.diff-toggle-btn.active {
+    color: var(--list-active-selection-fg);
+    background: var(--list-active-selection-bg);
+    border-color: var(--focus-border);
+}
 
 /* ── Welcome ───────────────────────────────────────────────────────── */
 #welcome {
