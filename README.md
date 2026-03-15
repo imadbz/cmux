@@ -56,6 +56,15 @@ Split a browser alongside your terminal with a scriptable API ported from <a hre
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Code editor</h3>
+A built-in Monaco-powered code editor panel with file explorer, syntax highlighting, and git status. Split it alongside your terminal to edit files without leaving cmux.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Vertical + horizontal tabs</h3>
 Sidebar shows git branch, linked PR status/number, working directory, listening ports, and latest notification text. Split horizontally and vertically.
 </td>
@@ -171,6 +180,12 @@ Browser developer-tool shortcuts follow Safari defaults and are customizable in 
 | ⌘ R | Reload page |
 | ⌥ ⌘ I | Toggle Developer Tools (Safari default) |
 | ⌥ ⌘ C | Show JavaScript Console (Safari default) |
+
+### Editor
+
+| Shortcut | Action |
+|----------|--------|
+| ⌘ ⇧ E | Open editor in split |
 
 ### Notifications
 

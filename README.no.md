@@ -58,6 +58,15 @@ Del en nettleser ved siden av terminalen med et skriptbart API portet fra <a hre
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Kodeeditor</h3>
+Et innebygd Monaco-basert kodeeditor-panel med filutforsker, syntaksutheving og git-status. Del det ved siden av terminalen din for å redigere filer uten å forlate cmux.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Vertikale + horisontale faner</h3>
 Sidefeltet viser git-gren, tilknyttet PR-status/nummer, arbeidsmappe, lyttende porter og siste varselstekst. Del horisontalt og vertikalt.
 </td>
@@ -173,6 +182,12 @@ Nettleserens utviklerverktøysnarveier følger Safari-standarder og kan tilpasse
 | ⌘ R | Last inn siden på nytt |
 | ⌥ ⌘ I | Vis/skjul utviklerverktøy (Safari-standard) |
 | ⌥ ⌘ C | Vis JavaScript-konsoll (Safari-standard) |
+
+### Editor
+
+| Snarvei | Handling |
+|----------|--------|
+| ⌘ ⇧ E | Åpne editor i delt visning |
 
 ### Varsler
 

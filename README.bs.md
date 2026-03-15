@@ -58,6 +58,15 @@ Podijelite preglednik pored terminala sa skriptabilnim API portiranim iz <a href
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Editor koda</h3>
+Ugrađeni panel za uređivanje koda baziran na Monacu sa preglednikom datoteka, isticanjem sintakse i git statusom. Podijelite ga pored terminala za uređivanje datoteka bez napuštanja cmuxa.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Vertikalni + horizontalni tabovi</h3>
 Bočna traka prikazuje git granu, status/broj povezanog PR-a, radni direktorij, portove koji slušaju i tekst posljednjeg obavještenja. Horizontalna i vertikalna podjela.
 </td>
@@ -173,6 +182,12 @@ Prečice razvojnih alata preglednika prate Safari zadane postavke i mogu se pril
 | ⌘ R | Ponovo učitaj stranicu |
 | ⌥ ⌘ I | Prikaži/sakrij Alate za Programere (Safari zadano) |
 | ⌥ ⌘ C | Prikaži JavaScript Konzolu (Safari zadano) |
+
+### Editor
+
+| Prečica | Akcija |
+|----------|--------|
+| ⌘ ⇧ E | Otvori editor u podijeljenom prikazu |
 
 ### Obavještenja
 

@@ -58,6 +58,15 @@ Dividi un browser accanto al tuo terminale con un'API scriptabile derivata da <a
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Editor di codice</h3>
+Un pannello editor di codice integrato basato su Monaco con esplora file, evidenziazione della sintassi e stato git. Dividilo accanto al tuo terminale per modificare i file senza uscire da cmux.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Schede verticali + orizzontali</h3>
 La barra laterale mostra il branch git, lo stato/numero della PR collegata, la directory di lavoro, le porte in ascolto e il testo dell'ultima notifica. Dividi orizzontalmente e verticalmente.
 </td>
@@ -173,6 +182,12 @@ Le scorciatoie degli strumenti di sviluppo del browser seguono i valori predefin
 | ⌘ R | Ricarica pagina |
 | ⌥ ⌘ I | Mostra/Nascondi Strumenti di Sviluppo (predefinito Safari) |
 | ⌥ ⌘ C | Mostra Console JavaScript (predefinito Safari) |
+
+### Editor
+
+| Scorciatoia | Azione |
+|----------|--------|
+| ⌘ ⇧ E | Apri editor in split |
 
 ### Notifiche
 

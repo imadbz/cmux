@@ -58,6 +58,15 @@ Divisez un navigateur à côté de votre terminal avec une API scriptable porté
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Éditeur de code</h3>
+Un panneau d'édition de code intégré basé sur Monaco avec explorateur de fichiers, coloration syntaxique et statut git. Divisez-le à côté de votre terminal pour éditer des fichiers sans quitter cmux.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Onglets verticaux + horizontaux</h3>
 La barre latérale affiche la branche git, le statut/numéro de PR lié, le répertoire de travail, les ports en écoute et le texte de la dernière notification. Divisez horizontalement et verticalement.
 </td>
@@ -173,6 +182,12 @@ Les raccourcis des outils de développement du navigateur suivent les valeurs pa
 | ⌘ R | Recharger la page |
 | ⌥ ⌘ I | Basculer les outils de développement (par défaut Safari) |
 | ⌥ ⌘ C | Afficher la console JavaScript (par défaut Safari) |
+
+### Éditeur
+
+| Raccourci | Action |
+|----------|--------|
+| ⌘ ⇧ E | Ouvrir l'éditeur en split |
 
 ### Notifications
 

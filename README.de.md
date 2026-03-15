@@ -58,6 +58,15 @@ Teilen Sie einen Browser neben Ihrem Terminal mit einer skriptfähigen API, port
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Code-Editor</h3>
+Ein integrierter Monaco-basierter Code-Editor mit Datei-Explorer, Syntaxhervorhebung und Git-Status. Teilen Sie ihn neben Ihrem Terminal, um Dateien zu bearbeiten, ohne cmux zu verlassen.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Vertikale + horizontale Tabs</h3>
 Die Seitenleiste zeigt Git-Branch, verknüpften PR-Status/Nummer, Arbeitsverzeichnis, lauschende Ports und den neuesten Benachrichtigungstext. Horizontal und vertikal teilen.
 </td>
@@ -173,6 +182,12 @@ Tastenkürzel für Browser-Entwicklertools folgen den Safari-Standardeinstellung
 | ⌘ R | Seite neu laden |
 | ⌥ ⌘ I | Entwicklertools umschalten (Safari-Standard) |
 | ⌥ ⌘ C | JavaScript-Konsole anzeigen (Safari-Standard) |
+
+### Editor
+
+| Tastenkürzel | Aktion |
+|----------|--------|
+| ⌘ ⇧ E | Editor im Split öffnen |
 
 ### Benachrichtigungen
 

@@ -58,6 +58,15 @@ Podziel przeglądarkę obok terminala ze skryptowalnym API przeniesionym z <a hr
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Edytor kodu</h3>
+Wbudowany panel edytora kodu oparty na Monaco z eksploratorem plików, podświetlaniem składni i statusem git. Podziel go obok terminala, aby edytować pliki bez opuszczania cmux.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Pionowe + poziome karty</h3>
 Pasek boczny pokazuje gałąź git, status/numer powiązanego PR, katalog roboczy, nasłuchujące porty i tekst ostatniego powiadomienia. Podziały poziome i pionowe.
 </td>
@@ -173,6 +182,12 @@ Skróty narzędzi deweloperskich przeglądarki odpowiadają domyślnym ustawieni
 | ⌘ R | Przeładuj stronę |
 | ⌥ ⌘ I | Przełącz Narzędzia Deweloperskie (domyślne Safari) |
 | ⌥ ⌘ C | Pokaż Konsolę JavaScript (domyślne Safari) |
+
+### Edytor
+
+| Skrót | Akcja |
+|----------|--------|
+| ⌘ ⇧ E | Otwórz edytor w podziale |
 
 ### Powiadomienia
 

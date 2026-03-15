@@ -58,6 +58,15 @@ Del en browser ved siden af din terminal med en scriptbar API porteret fra <a hr
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Kodeeditor</h3>
+Et indbygget Monaco-baseret kodeeditor-panel med filudforsker, syntaksfremhævning og git-status. Del det ved siden af din terminal for at redigere filer uden at forlade cmux.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Lodrette + vandrette faner</h3>
 Sidebjælken viser git-branch, tilknyttet PR-status/nummer, arbejdsmappe, lyttende porte og seneste notifikationstekst. Del vandret og lodret.
 </td>
@@ -173,6 +182,12 @@ Browserens udviklerværktøjsgenveje følger Safaris standarder og kan tilpasses
 | ⌘ R | Genindlæs side |
 | ⌥ ⌘ I | Slå Udviklerværktøjer til/fra (Safari-standard) |
 | ⌥ ⌘ C | Vis JavaScript-konsol (Safari-standard) |
+
+### Editor
+
+| Genvej | Handling |
+|----------|--------|
+| ⌘ ⇧ E | Åbn editor i split |
 
 ### Notifikationer
 

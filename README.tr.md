@@ -58,6 +58,15 @@ Bekleyen tüm bildirimleri tek bir yerden görün, en son okunmamışa atlayın
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Kod editörü</h3>
+Dosya gezgini, sözdizimi vurgulama ve git durumu içeren Monaco tabanlı yerleşik bir kod editörü paneli. cmux'tan ayrılmadan dosyaları düzenlemek için terminalinizin yanında bölün.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Dikey + yatay sekmeler</h3>
 Kenar çubuğu git dalını, bağlantılı PR durumunu/numarasını, çalışma dizinini, dinlenen portları ve en son bildirim metnini gösterir. Yatay ve dikey bölmeler.
 </td>
@@ -173,6 +182,12 @@ Tarayıcı geliştirici araçları kısayolları Safari varsayılanlarını taki
 | ⌘ R | Sayfayı yeniden yükle |
 | ⌥ ⌘ I | Geliştirici Araçlarını aç/kapat (Safari varsayılanı) |
 | ⌥ ⌘ C | JavaScript Konsolunu göster (Safari varsayılanı) |
+
+### Editör
+
+| Kısayol | Eylem |
+|----------|--------|
+| ⌘ ⇧ E | Editörü bölünmüş ekranda aç |
 
 ### Bildirimler
 

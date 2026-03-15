@@ -58,6 +58,15 @@
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>程式碼編輯器</h3>
+內建基於 Monaco 的程式碼編輯器面板，包含檔案瀏覽器、語法高亮和 git 狀態。與終端分屏顯示，無需離開 cmux 即可編輯檔案。
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>垂直 + 水平分頁</h3>
 側邊欄顯示 git 分支、關聯的 PR 狀態/編號、工作目錄、監聽連接埠和最新通知文字。支援水平和垂直分割。
 </td>
@@ -173,6 +182,12 @@ cmux 是一個基礎元件，而非完整方案。它提供終端機、瀏覽器
 | ⌘ R | 重新整理頁面 |
 | ⌥ ⌘ I | 切換開發者工具（Safari 預設） |
 | ⌥ ⌘ C | 顯示 JavaScript 主控台（Safari 預設） |
+
+### 編輯器
+
+| 快捷鍵 | 動作 |
+|----------|--------|
+| ⌘ ⇧ E | 在分屏中開啟編輯器 |
 
 ### 通知
 

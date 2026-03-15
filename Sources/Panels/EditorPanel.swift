@@ -34,6 +34,8 @@ final class EditorMessageHandler: NSObject, WKScriptMessageHandler {
             handleRenameFile(body: body, webView: message.webView)
         case "gitStatus":
             handleGitStatus(body: body, webView: message.webView)
+        case "gitShow":
+            handleGitShow(body: body, webView: message.webView)
         case "dirtyState":
             let dirty = body["isDirty"] as? Bool ?? false
             DispatchQueue.main.async { self.onDirtyStateChanged?(dirty) }
@@ -315,6 +317,40 @@ final class EditorMessageHandler: NSObject, WKScriptMessageHandler {
                 "ignored": ignoredFiles
             ]
             self.sendResponse(requestId: requestId, data: result, webView: webView)
+        }
+    }
+
+    private func handleGitShow(body: [String: Any], webView: WKWebView?) {
+        let relativePath = body["path"] as? String ?? ""
+        let ref = body["ref"] as? String ?? "HEAD"
+        let requestId = body["requestId"] as? String ?? ""
+
+        DispatchQueue.global(qos: .userInitiated).async { [rootPath] in
+            let process = Process()
+            let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["-C", rootPath, "show", "--textconv", "\(ref):\(relativePath)"]
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+
+            do {
+                try process.run()
+            } catch {
+                self.sendError(requestId: requestId, message: "git not available", webView: webView)
+                return
+            }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+
+            if process.terminationStatus != 0 {
+                // File doesn't exist in git (new/untracked file)
+                self.sendResponse(requestId: requestId, data: ["content": "", "exists": false], webView: webView)
+                return
+            }
+
+            let content = String(data: data, encoding: .utf8) ?? ""
+            self.sendResponse(requestId: requestId, data: ["content": content, "exists": true], webView: webView)
         }
     }
 

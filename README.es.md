@@ -58,6 +58,15 @@ Divide un navegador junto a tu terminal con una API programable portada de <a hr
 </tr>
 <tr>
 <td width="40%" valign="middle">
+<h3>Editor de código</h3>
+Un panel de edición de código integrado basado en Monaco con explorador de archivos, resaltado de sintaxis y estado de git. Divídelo junto a tu terminal para editar archivos sin salir de cmux.
+</td>
+<td width="60%">
+<img src="./docs/assets/built-in-browser.png" alt="Code editor" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 <h3>Pestañas verticales + horizontales</h3>
 La barra lateral muestra la rama de git, el estado/número del PR vinculado, el directorio de trabajo, los puertos en escucha y el texto de la última notificación. Divide horizontal y verticalmente.
 </td>
@@ -173,6 +182,12 @@ Los atajos de herramientas de desarrollo del navegador siguen los valores predet
 | ⌘ R | Recargar página |
 | ⌥ ⌘ I | Alternar herramientas de desarrollo (predeterminado de Safari) |
 | ⌥ ⌘ C | Mostrar consola de JavaScript (predeterminado de Safari) |
+
+### Editor
+
+| Atajo | Acción |
+|----------|--------|
+| ⌘ ⇧ E | Abrir editor en split |
 
 ### Notificaciones
 

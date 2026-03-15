@@ -69,6 +69,10 @@
     }
 
     // ── File Ops ───────────────────────────────────────────────────────
+    let diffEditor = null;
+    let diffSideBySide = true;
+    let currentDiffPath = null;
+
     const readDir = (path) => post('readDir', { path });
     const readFile = async (path) => (await post('readFile', { path })).content;
     const writeFile = (path, content) => post('writeFile', { path, content });
@@ -77,6 +81,7 @@
     const deleteFile = (path) => post('deleteFile', { path });
     const renameFile = (oldPath, newPath) => post('renameFile', { oldPath, newPath });
     const getGitStatus = () => post('gitStatus', {});
+    const gitShow = (path, ref = 'HEAD') => post('gitShow', { path, ref });
 
     function notifyDirty() {
         let d = false;
@@ -445,10 +450,20 @@
 
         const parentDir = isDir ? targetPath : targetPath.substring(0, targetPath.lastIndexOf('/')) || '';
 
+        const gitStatus = isDir ? null : getGitStatusForPath(targetPath);
         const items = [
             { label: 'New File...', action: () => promptNewFile(parentDir) },
             { label: 'New Folder...', action: () => promptNewFolder(parentDir) },
             { separator: true },
+        ];
+
+        // Add diff option for git-tracked modified files
+        if (gitStatus && gitStatus !== 'ignored' && gitStatus !== 'untracked' && !isDir) {
+            items.push({ label: 'Open Changes', action: () => openDiff(targetPath, name) });
+            items.push({ separator: true });
+        }
+
+        items.push(
             { label: 'Rename', shortcut: 'F2', action: () => {
                 const row = treeEl.querySelector(`[data-path="${CSS.escape(targetPath)}"]`);
                 if (row) startInlineRename(row, targetPath, name);
@@ -457,7 +472,7 @@
             { separator: true },
             { label: 'Copy Path', shortcut: '\u2318\u2325C', action: () => copyToClipboard(targetPath) },
             { label: 'Copy Relative Path', action: () => copyToClipboard(targetPath) },
-        ];
+        );
 
         for (const item of items) {
             if (item.separator) {
@@ -798,6 +813,133 @@
         } catch (err) { console.error('Save failed:', err); }
     }
 
+    // ── Diff View ───────────────────────────────────────────────────────
+    async function openDiff(path, name) {
+        const gitStatus = getGitStatusForPath(path);
+        if (!gitStatus || gitStatus === 'ignored' || gitStatus === 'untracked') {
+            // No git history — just open normally
+            openFile(path, name);
+            return;
+        }
+
+        try {
+            const result = await gitShow(path);
+            const originalContent = result.exists ? result.content : '';
+            const currentContent = await readFile(path);
+
+            showDiffEditor(path, name, originalContent, currentContent, gitStatus);
+        } catch (err) {
+            console.error('Failed to open diff:', err);
+            openFile(path, name);
+        }
+    }
+
+    function showDiffEditor(path, name, originalContent, modifiedContent, status) {
+        currentDiffPath = path;
+
+        // Hide normal editor, show diff
+        document.getElementById('editor-container').classList.remove('visible');
+        document.getElementById('welcome').classList.remove('welcome-visible');
+        const diffContainer = document.getElementById('diff-container');
+        diffContainer.classList.add('visible');
+        diffContainer.innerHTML = '';
+
+        // Toolbar
+        const toolbar = document.createElement('div');
+        toolbar.className = 'diff-toolbar';
+
+        const title = document.createElement('span');
+        title.className = 'diff-toolbar-title';
+        const statusLabel = { modified: 'Modified', added: 'Added', deleted: 'Deleted', renamed: 'Renamed', conflict: 'Conflict' };
+        title.textContent = `${name} (${statusLabel[status] || status}) \u2194 ${name} (Working Tree)`;
+        toolbar.appendChild(title);
+
+        const actions = document.createElement('span');
+        actions.className = 'diff-toolbar-actions';
+
+        // Side-by-side toggle
+        const sxsBtn = document.createElement('button');
+        sxsBtn.className = 'diff-toolbar-btn' + (diffSideBySide ? ' active' : '');
+        sxsBtn.textContent = 'Side by Side';
+        sxsBtn.addEventListener('click', () => {
+            diffSideBySide = true;
+            sxsBtn.classList.add('active');
+            inlineBtn.classList.remove('active');
+            if (diffEditor) diffEditor.updateOptions({ renderSideBySide: true });
+        });
+        actions.appendChild(sxsBtn);
+
+        const inlineBtn = document.createElement('button');
+        inlineBtn.className = 'diff-toolbar-btn' + (!diffSideBySide ? ' active' : '');
+        inlineBtn.textContent = 'Inline';
+        inlineBtn.addEventListener('click', () => {
+            diffSideBySide = false;
+            inlineBtn.classList.add('active');
+            sxsBtn.classList.remove('active');
+            if (diffEditor) diffEditor.updateOptions({ renderSideBySide: false });
+        });
+        actions.appendChild(inlineBtn);
+
+        // Close diff button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'diff-toolbar-btn';
+        closeBtn.textContent = '\u00D7 Close';
+        closeBtn.addEventListener('click', closeDiff);
+        actions.appendChild(closeBtn);
+
+        toolbar.appendChild(actions);
+        diffContainer.appendChild(toolbar);
+
+        // Diff editor wrapper
+        const wrap = document.createElement('div');
+        wrap.className = 'diff-editor-wrap';
+        diffContainer.appendChild(wrap);
+
+        // Create diff editor
+        if (diffEditor) diffEditor.dispose();
+        diffEditor = monacoInstance.editor.createDiffEditor(wrap, {
+            theme: 'cmux-dark',
+            fontSize: 13,
+            fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+            renderSideBySide: diffSideBySide,
+            enableSplitViewResizing: true,
+            ignoreTrimWhitespace: true,
+            renderIndicators: true,
+            originalEditable: false,
+            renderMarginRevertIcon: true,
+            diffAlgorithm: 'advanced',
+            renderOverviewRuler: true,
+            automaticLayout: true,
+            scrollBeyondLastLine: false,
+            padding: { top: 8, bottom: 8 },
+            minimap: { enabled: false },
+        });
+
+        const lang = getLang(name);
+        const originalModel = monacoInstance.editor.createModel(originalContent, lang);
+        const modifiedModel = monacoInstance.editor.createModel(modifiedContent, lang);
+
+        diffEditor.setModel({
+            original: originalModel,
+            modified: modifiedModel,
+        });
+    }
+
+    function closeDiff() {
+        currentDiffPath = null;
+        const diffContainer = document.getElementById('diff-container');
+        diffContainer.classList.remove('visible');
+        diffContainer.innerHTML = '';
+        if (diffEditor) { diffEditor.dispose(); diffEditor = null; }
+
+        // Restore normal editor
+        if (activeFilePath) {
+            document.getElementById('editor-container').classList.add('visible');
+        } else {
+            document.getElementById('welcome').classList.add('welcome-visible');
+        }
+    }
+
     // ── Sidebar Resize ─────────────────────────────────────────────────
     const sidebar = document.getElementById('sidebar');
     const handle = document.getElementById('sidebar-resize-handle');
@@ -813,6 +955,12 @@
         if (mod && e.key === 's') { e.preventDefault(); saveActive(); }
         if (mod && e.key === 'w') { e.preventDefault(); if (activeFilePath) closeFileTab(activeFilePath); }
         if (mod && e.key === 'n') { e.preventDefault(); promptNewFile(''); }
+        if (mod && e.key === 'd' && !e.shiftKey) {
+            // Cmd+D: open diff for active file
+            e.preventDefault();
+            const path = activeFilePath || selectedTreePath;
+            if (path) openDiff(path, path.split('/').pop());
+        }
         if (e.key === 'F2' && selectedTreePath) {
             e.preventDefault();
             const row = treeEl.querySelector(`[data-path="${CSS.escape(selectedTreePath)}"]`);
