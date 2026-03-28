@@ -9633,13 +9633,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         // File search: Cmd+Shift+F
         if matchShortcut(event: event, shortcut: StoredShortcut(key: "f", command: true, shift: true, option: false, control: false)) {
-            NotificationCenter.default.post(name: .cmuxSidebarSwitchToSearch, object: nil)
+            NotificationCenter.default.post(
+                name: .cmuxSidebarSwitchToSearch,
+                object: event.window ?? NSApp.keyWindow ?? NSApp.mainWindow
+            )
             return true
         }
 
         // Open explorer: Cmd+Shift+E — switch to file explorer sidebar tab
         if matchShortcut(event: event, shortcut: KeyboardShortcutSettings.shortcut(for: .openEditor)) {
-            NotificationCenter.default.post(name: .cmuxSidebarSwitchToExplorer, object: nil)
+            NotificationCenter.default.post(
+                name: .cmuxSidebarSwitchToExplorer,
+                object: event.window ?? NSApp.keyWindow ?? NSApp.mainWindow
+            )
             return true
         }
 
@@ -9887,7 +9893,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard let tabManager = tabManager,
               let tabId = tabManager.selectedTabId,
               let workspace = tabManager.tabs.first(where: { $0.id == tabId }) else { return }
-        let rootPath = workspace.currentDirectory
+        let rootPath = workspace.defaultEditorRootPath()
         _ = tabManager.openEditor(rootPath: rootPath)
     }
 

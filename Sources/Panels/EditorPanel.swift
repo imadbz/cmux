@@ -229,6 +229,10 @@ final class EditorPanel: Panel, ObservableObject {
         }
     }
 
+    func reattachToWorkspace(_ newWorkspaceId: UUID) {
+        workspaceId = newWorkspaceId
+    }
+
     deinit {
         if let observer = themeObserver {
             NotificationCenter.default.removeObserver(observer)

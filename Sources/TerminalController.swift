@@ -10964,6 +10964,7 @@ class TerminalController {
           reset_sidebar [--tab=X] - Clear sidebar metadata
 
         Browser commands:
+          open_editor [root_path]        - Create editor panel (defaults to current workspace project directory)
           open_browser [url]              - Create browser panel with optional URL
           navigate <panel_id> <url>       - Navigate browser to URL
           browser_back <panel_id>         - Go back in browser history
@@ -13454,7 +13455,7 @@ class TerminalController {
                       let tab = tabManager.tabs.first(where: { $0.id == tabId }) else {
                     return
                 }
-                rootPath = tab.currentDirectory
+                rootPath = tab.defaultEditorRootPath()
             } else {
                 rootPath = trimmed
             }

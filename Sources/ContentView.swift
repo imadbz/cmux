@@ -2362,11 +2362,25 @@ struct ContentView: View {
             SidebarTopScrim(height: sidebarTrafficLightPadding + 20)
                 .allowsHitTesting(false)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .cmuxSidebarSwitchToSearch)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .cmuxSidebarSwitchToSearch)) { notification in
+            let requestedWindow = notification.object as? NSWindow
+            guard Self.shouldHandleCommandPaletteRequest(
+                observedWindow: observedWindow,
+                requestedWindow: requestedWindow,
+                keyWindow: NSApp.keyWindow,
+                mainWindow: NSApp.mainWindow
+            ) else { return }
             sidebarTab = .search
             if !sidebarState.isVisible { sidebarState.isVisible = true }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .cmuxSidebarSwitchToExplorer)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .cmuxSidebarSwitchToExplorer)) { notification in
+            let requestedWindow = notification.object as? NSWindow
+            guard Self.shouldHandleCommandPaletteRequest(
+                observedWindow: observedWindow,
+                requestedWindow: requestedWindow,
+                keyWindow: NSApp.keyWindow,
+                mainWindow: NSApp.mainWindow
+            ) else { return }
             sidebarTab = .explorer
             if !sidebarState.isVisible { sidebarState.isVisible = true }
         }
@@ -2396,31 +2410,16 @@ struct ContentView: View {
             guard let tabManager else { return }
             guard let workspaceId = tabManager.selectedTabId,
                   let workspace = tabManager.tabs.first(where: { $0.id == workspaceId }) else { return }
-
-            // VS Code preview tab behavior:
-            // - If there's a preview (unpinned) editor, reuse it
-            // - If all editors are pinned (edited or double-clicked), create a new one
-            let previewEditor = workspace.panels.values
-                .compactMap { $0 as? EditorPanel }
-                .first(where: { $0.isPreview })
-
-            if let preview = previewEditor {
-                preview.openFileByPath(filePath)
-                workspace.focusPanel(preview.id)
-            } else {
-                let rootPath = workspace.currentDirectory
-                _ = tabManager.openEditor(rootPath: rootPath, filePath: filePath, focus: true)
-            }
+            openFileInEditor(filePath, workspace: workspace, tabManager: tabManager)
         }
         panel.onPinFile = { [weak tabManager] filePath in
             guard let tabManager else { return }
             guard let workspaceId = tabManager.selectedTabId,
                   let workspace = tabManager.tabs.first(where: { $0.id == workspaceId }) else { return }
 
-            // Find the preview editor showing this file and pin it
             if let previewEditor = workspace.panels.values
                 .compactMap({ $0 as? EditorPanel })
-                .first(where: { $0.isPreview }) {
+                .first(where: { $0.isPreview && $0.currentFilePath == filePath }) {
                 previewEditor.isPreview = false
                 workspace.focusPanel(previewEditor.id)
             }
@@ -2455,8 +2454,8 @@ struct ContentView: View {
         var seen = Set<String>()
         var paths: [String] = []
 
-        // Always include the workspace's own current directory first
-        let wsDir = workspace.currentDirectory
+        // Always include the workspace's project directory first.
+        let wsDir = workspace.defaultEditorRootPath()
         if seen.insert(wsDir).inserted {
             paths.append(wsDir)
         }
@@ -2482,15 +2481,7 @@ struct ContentView: View {
             guard let tabManager else { return }
             guard let workspaceId = tabManager.selectedTabId,
                   let workspace = tabManager.tabs.first(where: { $0.id == workspaceId }) else { return }
-            let previewEditor = workspace.panels.values
-                .compactMap { $0 as? EditorPanel }
-                .first(where: { $0.isPreview })
-            if let preview = previewEditor {
-                preview.openFileByPath(filePath)
-                workspace.focusPanel(preview.id)
-            } else {
-                _ = tabManager.openEditor(rootPath: workspace.currentDirectory, filePath: filePath, focus: true)
-            }
+            openFileInEditor(filePath, workspace: workspace, tabManager: tabManager)
         }
         nativeExplorerViewModel.onPinFile = { [weak tabManager] filePath in
             guard let tabManager else { return }
@@ -2498,12 +2489,35 @@ struct ContentView: View {
                   let workspace = tabManager.tabs.first(where: { $0.id == workspaceId }) else { return }
             if let previewEditor = workspace.panels.values
                 .compactMap({ $0 as? EditorPanel })
-                .first(where: { $0.isPreview }) {
+                .first(where: { $0.isPreview && $0.currentFilePath == filePath }) {
                 previewEditor.isPreview = false
                 workspace.focusPanel(previewEditor.id)
             }
         }
         fileSearchViewModel.onOpenFile = nativeExplorerViewModel.onOpenFile
+    }
+
+    private func openFileInEditor(_ filePath: String, workspace: Workspace, tabManager: TabManager) {
+        let previewEditor = workspace.panels.values
+            .compactMap { $0 as? EditorPanel }
+            .first(where: {
+                $0.isPreview && (
+                    filePath == $0.rootPath ||
+                    filePath.hasPrefix($0.rootPath + "/")
+                )
+            })
+
+        if let previewEditor {
+            previewEditor.openFileByPath(filePath)
+            workspace.focusPanel(previewEditor.id)
+            return
+        }
+
+        _ = tabManager.openEditor(
+            rootPath: workspace.editorRootPath(for: filePath),
+            filePath: filePath,
+            focus: true
+        )
     }
 
     private func updateNativeExplorerRoots() {

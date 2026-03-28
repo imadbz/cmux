@@ -9,6 +9,21 @@
         html, body { height: 100%; overflow: hidden; background: var(--editor-bg, #1f1f1f); color: var(--editor-fg, #cccccc); }
         :root { --editor-bg: #1f1f1f; --editor-fg: #cccccc; }
         #editor-container { width: 100%; height: 100%; }
+        #save-error {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            max-width: min(440px, calc(100vw - 24px));
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(183, 60, 40, 0.95);
+            color: #ffffff;
+            font: 12px/1.4 -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            display: none;
+            z-index: 20;
+        }
+        #save-error.visible { display: block; }
         #large-file-notice {
             display: none;
             width: 100%; height: 100%;
@@ -23,6 +38,7 @@
 </head>
 <body>
     <div id="editor-container"></div>
+    <div id="save-error" role="alert" aria-live="assertive"></div>
     <div id="large-file-notice">
         <div class="filename" id="large-file-name"></div>
         <div class="message" id="large-file-message"></div>

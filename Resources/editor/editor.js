@@ -12,6 +12,10 @@
     let isDirty = false;
     let requestCounter = 0;
     const pendingRequests = new Map();
+    const pendingTheme = {
+        editorBg: '#1f1f1f',
+        editorFg: '#c6c6c6'
+    };
 
     // ── Swift Bridge ───────────────────────────────────────────────────
     window.cmux = {
@@ -32,7 +36,13 @@
             p.reject(new Error(message));
         },
         updateMonacoTheme(editorBg, editorFg) {
-            if (!monacoInstance || !editor) return;
+            pendingTheme.editorBg = editorBg;
+            pendingTheme.editorFg = editorFg;
+            if (!monacoInstance) {
+                document.documentElement.style.setProperty('--editor-bg', editorBg);
+                document.documentElement.style.setProperty('--editor-fg', editorFg);
+                return;
+            }
             monacoInstance.editor.defineTheme('cmux-dark', {
                 base: 'vs-dark', inherit: true, rules: [],
                 colors: {
@@ -43,8 +53,11 @@
                     'editorLineNumber.activeForeground': editorFg + 'cc'
                 }
             });
-            monacoInstance.editor.setTheme('cmux-dark');
+            if (editor) {
+                monacoInstance.editor.setTheme('cmux-dark');
+            }
             document.documentElement.style.setProperty('--editor-bg', editorBg);
+            document.documentElement.style.setProperty('--editor-fg', editorFg);
         },
 
         // Called from Swift with file content already read — zero bridge round-trips
@@ -59,7 +72,15 @@
         // Called from Swift when file is too large
         showLargeFile(fileName, reason) {
             currentFilePath = null;
-            if (editor) editor.setModel(null);
+            if (editor) {
+                const oldModel = editor.getModel();
+                editor.setModel(null);
+                if (oldModel) oldModel.dispose();
+            }
+            originalContent = '';
+            isDirty = false;
+            notifyDirty(false);
+            hideSaveError();
             showLargeFileNotice(fileName, reason);
             notifyActive(fileName);
         },
@@ -92,11 +113,24 @@
         document.getElementById('editor-container').style.display = '';
     }
 
+    function showSaveError(message) {
+        const banner = document.getElementById('save-error');
+        if (!banner) return;
+        banner.textContent = message;
+        banner.classList.add('visible');
+    }
+
+    function hideSaveError() {
+        document.getElementById('save-error')?.classList.remove('visible');
+    }
+
     function doOpenFileWithContent(relativePath, fileName, content) {
         hideLargeFileNotice();
+        hideSaveError();
         currentFilePath = relativePath;
         originalContent = content;
         isDirty = false;
+        notifyDirty(false);
         const lang = getLang(fileName);
         const model = monacoInstance.editor.createModel(content, lang);
         const oldModel = editor.getModel();
@@ -151,13 +185,20 @@
 
     async function saveActive() {
         if (!currentFilePath || !editor) return;
-        const content = editor.getModel().getValue();
+        const model = editor.getModel();
+        if (!model) return;
+        const content = model.getValue();
         try {
             await writeFile(currentFilePath, content);
             originalContent = content;
             isDirty = false;
+            hideSaveError();
             notifyDirty(false);
-        } catch (err) { console.error('Save failed:', err); }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            showSaveError(`Save failed: ${message}`);
+            console.error('Save failed:', err);
+        }
     }
 
     function bootstrapMonaco(vsPath) {
@@ -165,17 +206,7 @@
 
         require(['vs/editor/editor.main'], async function (monaco) {
             monacoInstance = monaco;
-
-            monaco.editor.defineTheme('cmux-dark', {
-                base: 'vs-dark', inherit: true, rules: [],
-                colors: {
-                    'editor.background': '#1f1f1f',
-                    'editorGutter.background': '#1f1f1f',
-                    'editor.lineHighlightBackground': '#2a2d2e',
-                    'editorLineNumber.foreground': '#5a5a5a',
-                    'editorLineNumber.activeForeground': '#c6c6c6'
-                }
-            });
+            window.cmux.updateMonacoTheme(pendingTheme.editorBg, pendingTheme.editorFg);
 
             editor = monaco.editor.create(document.getElementById('editor-container'), {
                 theme: 'cmux-dark',
@@ -196,6 +227,7 @@
                 guides: { indentation: true, bracketPairs: true },
                 stickyScroll: { enabled: true }
             });
+            window.cmux.updateMonacoTheme(pendingTheme.editorBg, pendingTheme.editorFg);
 
             // Cmd+S — save
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveActive());
