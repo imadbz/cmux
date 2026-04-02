@@ -2,6 +2,14 @@ import Foundation
 import AppKit
 import WebKit
 
+private final class WeakExplorerSidebarPanelBox {
+    weak var panel: ExplorerSidebarPanel?
+
+    init(_ panel: ExplorerSidebarPanel) {
+        self.panel = panel
+    }
+}
+
 /// Message handler for the sidebar file explorer WebView.
 /// Self-contained file system handler that responds via `window.cmuxExplorer`.
 final class ExplorerMessageHandler: NSObject, WKScriptMessageHandler {
@@ -26,14 +34,14 @@ final class ExplorerMessageHandler: NSObject, WKScriptMessageHandler {
         case "pinFileExternal":
             guard let relativePath = body["path"] as? String,
                   let root = rootPath(for: body) else { return }
-            let fullPath = (root as NSString).appendingPathComponent(relativePath)
+            guard let fullPath = resolvedPath(relativePath, rootPath: root) else { return }
             DispatchQueue.main.async { [weak self] in
                 self?.onPinFile?(fullPath)
             }
         case "openFileExternal":
             guard let relativePath = body["path"] as? String,
                   let root = rootPath(for: body) else { return }
-            let fullPath = (root as NSString).appendingPathComponent(relativePath)
+            guard let fullPath = resolvedPath(relativePath, rootPath: root) else { return }
             DispatchQueue.main.async { [weak self] in
                 self?.onOpenFile?(fullPath)
             }
@@ -271,6 +279,7 @@ final class ExplorerSidebarPanel: ObservableObject {
     private var messageHandler: ExplorerMessageHandler
     private var themeObserver: NSObjectProtocol?
     private var fsEventStream: FSEventStreamRef?
+    private var fsEventContextBox: Unmanaged<WeakExplorerSidebarPanelBox>?
     fileprivate var hasLoaded = false
 
     var onOpenFile: ((String) -> Void)? {
@@ -315,11 +324,7 @@ final class ExplorerSidebarPanel: ObservableObject {
         if let observer = themeObserver {
             NotificationCenter.default.removeObserver(observer)
         }
-        if let stream = fsEventStream {
-            FSEventStreamStop(stream)
-            FSEventStreamInvalidate(stream)
-            FSEventStreamRelease(stream)
-        }
+        stopFSEvents()
     }
 
     /// Update the root paths shown in the explorer. Only reloads JS if paths changed.
@@ -341,12 +346,14 @@ final class ExplorerSidebarPanel: ObservableObject {
 
         let paths = rootPaths as CFArray
         var context = FSEventStreamContext()
-        // Use Unmanaged to pass self as a pointer
-        context.info = Unmanaged.passUnretained(self).toOpaque()
+        let weakBox = Unmanaged.passRetained(WeakExplorerSidebarPanelBox(self))
+        fsEventContextBox = weakBox
+        context.info = weakBox.toOpaque()
 
-        let callback: FSEventStreamCallback = { _, info, numEvents, eventPaths, _, _ in
+        let callback: FSEventStreamCallback = { _, info, _, _, _, _ in
             guard let info else { return }
-            let panel = Unmanaged<ExplorerSidebarPanel>.fromOpaque(info).takeUnretainedValue()
+            let weakBox = Unmanaged<WeakExplorerSidebarPanelBox>.fromOpaque(info).takeUnretainedValue()
+            guard let panel = weakBox.panel else { return }
             DispatchQueue.main.async {
                 panel.handleFSEvent()
             }
@@ -373,6 +380,8 @@ final class ExplorerSidebarPanel: ObservableObject {
         FSEventStreamInvalidate(stream)
         FSEventStreamRelease(stream)
         fsEventStream = nil
+        fsEventContextBox?.release()
+        fsEventContextBox = nil
     }
 
     private func handleFSEvent() {
@@ -422,11 +431,15 @@ final class ExplorerSidebarPanel: ObservableObject {
 
     /// Send the current root paths to the JS explorer so it can render them.
     func sendRootsToJS() {
-        let rootsJSON = rootPaths.enumerated().map { index, path in
-            let name = (path as NSString).lastPathComponent
-            return "{\"name\":\"\(name.replacingOccurrences(of: "\"", with: "\\\""))\",\"rootIndex\":\(index)}"
-        }.joined(separator: ",")
-        let js = "if (window.cmuxExplorer && window.cmuxExplorer.setRoots) { window.cmuxExplorer.setRoots([\(rootsJSON)]); }"
+        let roots = rootPaths.enumerated().map { index, path in
+            [
+                "name": (path as NSString).lastPathComponent,
+                "rootIndex": index,
+            ]
+        }
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: roots),
+              let jsonString = String(data: jsonData, encoding: .utf8) else { return }
+        let js = "if (window.cmuxExplorer && window.cmuxExplorer.setRoots) { window.cmuxExplorer.setRoots(\(jsonString)); }"
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 }

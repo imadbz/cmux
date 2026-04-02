@@ -1,5 +1,5 @@
 /* cmux Sidebar Explorer — file tree only */
-@import url('https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css');
+@import './codicon.css';
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 

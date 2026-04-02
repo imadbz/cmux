@@ -1,6 +1,14 @@
 import SwiftUI
 import AppKit
 
+private final class WeakFileTreeRootBox {
+    weak var root: FileTreeRoot?
+
+    init(_ root: FileTreeRoot) {
+        self.root = root
+    }
+}
+
 // MARK: - Data Model
 
 /// Represents a file/directory entry in the explorer tree.
@@ -40,6 +48,7 @@ final class FileTreeRoot: ObservableObject, Identifiable {
     @Published var gitIgnoredPaths: Set<String> = []
 
     private var fsEventStream: FSEventStreamRef?
+    private var fsEventContextBox: Unmanaged<WeakFileTreeRootBox>?
     private var debounceWorkItem: DispatchWorkItem?
 
     var onChanged: (() -> Void)?
@@ -52,11 +61,7 @@ final class FileTreeRoot: ObservableObject, Identifiable {
     }
 
     deinit {
-        if let stream = fsEventStream {
-            FSEventStreamStop(stream)
-            FSEventStreamInvalidate(stream)
-            FSEventStreamRelease(stream)
-        }
+        stopFSEvents()
     }
 
     func loadChildren() {
@@ -266,13 +271,18 @@ final class FileTreeRoot: ObservableObject, Identifiable {
     // MARK: - FSEvents
 
     private func startFSEvents() {
+        stopFSEvents()
+
         let paths = [path] as CFArray
         var context = FSEventStreamContext()
-        context.info = Unmanaged.passUnretained(self).toOpaque()
+        let weakBox = Unmanaged.passRetained(WeakFileTreeRootBox(self))
+        fsEventContextBox = weakBox
+        context.info = weakBox.toOpaque()
 
         let callback: FSEventStreamCallback = { _, info, _, _, _, _ in
             guard let info else { return }
-            let root = Unmanaged<FileTreeRoot>.fromOpaque(info).takeUnretainedValue()
+            let weakBox = Unmanaged<WeakFileTreeRootBox>.fromOpaque(info).takeUnretainedValue()
+            guard let root = weakBox.root else { return }
             DispatchQueue.main.async {
                 root.debouncedRefresh()
             }
@@ -287,6 +297,17 @@ final class FileTreeRoot: ObservableObject, Identifiable {
         FSEventStreamScheduleWithRunLoop(stream, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
         FSEventStreamStart(stream)
         fsEventStream = stream
+    }
+
+    private func stopFSEvents() {
+        if let stream = fsEventStream {
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+            fsEventStream = nil
+        }
+        fsEventContextBox?.release()
+        fsEventContextBox = nil
     }
 
     private func debouncedRefresh() {

@@ -5169,6 +5169,7 @@ final class Workspace: Identifiable, ObservableObject {
     @Published var customTitle: String?
     @Published var isPinned: Bool = false
     @Published var customColor: String?  // hex string, e.g. "#C0392B"
+    let projectDirectory: String
     @Published var currentDirectory: String
     private(set) var preferredBrowserProfileID: UUID?
 
@@ -5440,6 +5441,9 @@ final class Workspace: Identifiable, ObservableObject {
 
         let trimmedWorkingDirectory = workingDirectory?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let hasWorkingDirectory = !trimmedWorkingDirectory.isEmpty
+        self.projectDirectory = hasWorkingDirectory
+            ? trimmedWorkingDirectory
+            : FileManager.default.homeDirectoryForCurrentUser.path
         self.currentDirectory = hasWorkingDirectory
             ? trimmedWorkingDirectory
             : FileManager.default.homeDirectoryForCurrentUser.path
@@ -6337,6 +6341,30 @@ final class Workspace: Identifiable, ObservableObject {
         guard let directory else { return nil }
         let trimmed = directory.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    func defaultEditorRootPath() -> String {
+        normalizedSidebarDirectory(projectDirectory)
+            ?? normalizedSidebarDirectory(currentDirectory)
+            ?? FileManager.default.homeDirectoryForCurrentUser.path
+    }
+
+    func editorRootPath(for absolutePath: String) -> String {
+        let canonicalTarget = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
+        let candidates = [defaultEditorRootPath()] + panelDirectories.values.compactMap {
+            normalizedSidebarDirectory($0)
+        }
+
+        var seen = Set<String>()
+        for candidate in candidates {
+            let canonicalCandidate = URL(fileURLWithPath: candidate).resolvingSymlinksInPath().path
+            guard seen.insert(canonicalCandidate).inserted else { continue }
+            if canonicalTarget == canonicalCandidate || canonicalTarget.hasPrefix(canonicalCandidate + "/") {
+                return candidate
+            }
+        }
+
+        return defaultEditorRootPath()
     }
 
     private func sidebarHomeDirectoryForCanonicalization(
@@ -7529,13 +7557,12 @@ final class Workspace: Identifiable, ObservableObject {
     }
 
     private func installEditorPanelSubscription(_ editorPanel: EditorPanel) {
-        let subscription = Publishers.CombineLatest3(
+        let subscription = Publishers.CombineLatest(
             editorPanel.$displayTitle.removeDuplicates(),
-            editorPanel.$isDirty.removeDuplicates(),
-            editorPanel.$isPreview.removeDuplicates()
+            editorPanel.$isDirty.removeDuplicates()
         )
         .receive(on: DispatchQueue.main)
-        .sink { [weak self, weak editorPanel] newTitle, isDirty, isPreview in
+        .sink { [weak self, weak editorPanel] newTitle, isDirty in
             guard let self, let editorPanel,
                   let tabId = self.surfaceIdFromPanelId(editorPanel.id),
                   let existing = self.bonsplitController.tab(tabId) else { return }
@@ -7546,15 +7573,13 @@ final class Workspace: Identifiable, ObservableObject {
             let resolvedTitle = self.resolvedPanelTitle(panelId: editorPanel.id, fallback: newTitle)
             let titleUpdate: String? = existing.title == resolvedTitle ? nil : resolvedTitle
             let dirtyUpdate: Bool? = existing.isDirty == isDirty ? nil : isDirty
-            let italicUpdate: Bool? = existing.isItalic == isPreview ? nil : isPreview
 
-            guard titleUpdate != nil || dirtyUpdate != nil || italicUpdate != nil else { return }
+            guard titleUpdate != nil || dirtyUpdate != nil else { return }
             self.bonsplitController.updateTab(
                 tabId,
                 title: titleUpdate,
                 hasCustomTitle: self.panelCustomTitles[editorPanel.id] != nil,
-                isDirty: dirtyUpdate,
-                isItalic: italicUpdate
+                isDirty: dirtyUpdate
             )
         }
         panelSubscriptions[editorPanel.id] = subscription
@@ -8040,6 +8065,9 @@ final class Workspace: Identifiable, ObservableObject {
                 remoteStatus: browserRemoteWorkspaceStatusSnapshot()
             )
             installBrowserPanelSubscription(browserPanel)
+        } else if let editorPanel = detached.panel as? EditorPanel {
+            editorPanel.reattachToWorkspace(id)
+            installEditorPanelSubscription(editorPanel)
         }
 
         if let directory = detached.directory {
@@ -10359,7 +10387,7 @@ extension Workspace: BonsplitDelegate {
         case "browser":
             _ = newBrowserSurface(inPane: pane)
         case "editor":
-            _ = newEditorSurface(inPane: pane, rootPath: currentDirectory)
+            _ = newEditorSurface(inPane: pane, rootPath: defaultEditorRootPath())
         default:
             _ = newTerminalSurface(inPane: pane)
         }
